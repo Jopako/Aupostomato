@@ -15,6 +15,7 @@ export interface Pt {
  *   #  parede          .  chão          S  início       P  portal (símbolo c)
  *   a  carta (símbolo a, empilha)        o  carta extra: só aparece com "Colete"
  *   D  porta (símbolo b, entrega o topo da pilha na mão)
+ *   T  lixo (símbolo d, descarta o topo da pilha)
  */
 export interface LayoutDef {
   id: string;
@@ -37,6 +38,7 @@ export interface Parsed {
   wall: boolean[][];
   start: Pt;
   portal: Pt;
+  trash: Pt;
   doors: Pt[];
   slots: Slot[];
   baseSlots: number;
@@ -52,6 +54,7 @@ export function parseLayout(def: LayoutDef): Parsed {
   const wall: boolean[][] = [];
   let start: Pt | null = null;
   let portal: Pt | null = null;
+  let trash: Pt | null = null;
   const doors: Pt[] = [];
   const base: Pt[] = [];
   const bonus: Pt[] = [];
@@ -63,13 +66,14 @@ export function parseLayout(def: LayoutDef): Parsed {
       wall[y].push(ch === '#' || ch === ' ');
       if (ch === 'S') start = { x, y };
       else if (ch === 'P') portal = { x, y };
+      else if (ch === 'T') trash = { x, y };
       else if (ch === 'D') doors.push({ x, y });
       else if (ch === 'a') base.push({ x, y });
       else if (ch === 'o') bonus.push({ x, y });
       else if (ch !== '#' && ch !== ' ' && ch !== '.') throw new Error(`${def.id}: caractere inválido '${ch}'`);
     }
   });
-  if (!start || !portal) throw new Error(`${def.id}: falta S ou P`);
+  if (!start || !portal || !trash) throw new Error(`${def.id}: falta S, P ou T`);
   const slots: Slot[] = [...base.map((p) => ({ ...p, bonus: false })), ...bonus.map((p) => ({ ...p, bonus: true }))].map((s, idx) => ({ ...s, idx }));
   return {
     id: def.id,
@@ -80,6 +84,7 @@ export function parseLayout(def: LayoutDef): Parsed {
     wall,
     start,
     portal,
+    trash,
     doors,
     slots,
     baseSlots: base.length,
@@ -96,7 +101,7 @@ export const LAYOUTS: LayoutDef[] = [
     rows: [
       '###############',
       '#a...a...D...a#',
-      '#.###.....###.#',
+      '#.###..T..###.#',
       '#...D..a..D...#',
       '#.a..#...#..a.#',
       '#o...#.D.#...o#',
@@ -112,7 +117,7 @@ export const LAYOUTS: LayoutDef[] = [
     rows: [
       '###############',
       '##a#D#a#a#D#a##',
-      '##.#.#.#.#.#.##',
+      '##T#.#.#.#.#.##',
       '##.#.#.#.#.#.##',
       '#S...a...a.D.P#',
       '##.#.#.#.#.#.##',
@@ -128,7 +133,7 @@ export const LAYOUTS: LayoutDef[] = [
     rows: [
       '###############',
       '#P..a..D..a...#',
-      '#.###...###...#',
+      '#.###.T.###...#',
       '#D..a...D..a..#',
       '#...###.......#',
       '#a..D...a..D..#',
@@ -144,7 +149,7 @@ export const LAYOUTS: LayoutDef[] = [
     rows: [
       '###############',
       '##a#D#a#D#a#o##',
-      '##.#.#.#.#.#.##',
+      '##T#.#.#.#.#.##',
       '##.#.#.#.#.#.##',
       '#S.a...D.a.a.P#',
       '##.#.#.#.#.#.##',
@@ -162,7 +167,7 @@ export const LAYOUTS: LayoutDef[] = [
       '#S.a..D..a..a.#',
       '#.............#',
       '#a..D..a..D..a#',
-      '#.............#',
+      '#......T......#',
       '#D..a..D..a..P#',
       '#.............#',
       '#o...........o#',
@@ -176,7 +181,7 @@ export const LAYOUTS: LayoutDef[] = [
     rows: [
       '###############',
       '#S..a..D..a..D#',
-      '#.............#',
+      '#......T......#',
       '#D..a..D..a..D#',
       '#.............#',
       '#..a.D..a.D..P#',
@@ -216,6 +221,10 @@ export interface Walk {
   cfg: Config;
   /** cartas na pilha, da base ao topo (cfg.stack.length - 1 elementos) */
   stackCards: Card[];
+  /** vaga de origem de cada carta ainda empilhada */
+  stackSlots: number[];
+  /** todas as cartas empilhadas nesta caminhada, incluindo as descartadas */
+  pushedCards: Card[];
   /** índices dos slots já recolhidos (na pilha ou já entregues) */
   picked: number[];
   usedDoors: Record<string, number>;
@@ -233,6 +242,8 @@ export function newWalk(p: Parsed): Walk {
     y: p.start.y,
     cfg: initialConfig(MESA_PDA),
     stackCards: [],
+    stackSlots: [],
+    pushedCards: [],
     picked: [],
     usedDoors: {},
     delivered: [],
@@ -244,7 +255,7 @@ export function newWalk(p: Parsed): Walk {
   };
 }
 
-export type Symbol3 = 'a' | 'b' | 'c';
+export type Symbol3 = 'a' | 'b' | 'c' | 'd';
 
 export interface GameEvent {
   symbol: Symbol3;
@@ -262,22 +273,31 @@ export type MoveResult =
   | { kind: 'blocked'; symbol: Symbol3; message: string; reason: string };
 
 /** Qual símbolo o jogador dispararia ao pisar em (x, y), ou null se for chão comum. */
-export function symbolAt(p: Parsed, slotCards: (Card | null)[], active: number, w: Walk, x: number, y: number): Symbol3 | null {
+export function symbolAt(
+  p: Parsed,
+  slotCards: (Card | null)[],
+  active: number,
+  w: Walk,
+  x: number,
+  y: number,
+  trashDiscards = 0,
+): Symbol3 | null {
   const k = key(x, y);
   const slot = p.slotAt.get(k);
   if (slot !== undefined && slot < active && slotCards[slot] && !w.picked.includes(slot)) return 'a';
   if (p.doorSet.has(k) && !(k in w.usedDoors)) return 'b';
+  if (x === p.trash.x && y === p.trash.y && w.stackCards.length > 0 && trashDiscards > 0) return 'd';
   if (x === p.portal.x && y === p.portal.y) return 'c';
   return null;
 }
 
-export function move(p: Parsed, slotCards: (Card | null)[], active: number, w: Walk, dir: Dir): MoveResult {
+export function move(p: Parsed, slotCards: (Card | null)[], active: number, w: Walk, dir: Dir, trashDiscards = 0): MoveResult {
   if (w.done) return { kind: 'done' };
   const [dx, dy] = DIRS[dir];
   const nx = w.x + dx;
   const ny = w.y + dy;
   if (nx < 0 || ny < 0 || nx >= p.w || ny >= p.h || p.wall[ny][nx]) return { kind: 'wall' };
-  const sym = symbolAt(p, slotCards, active, w, nx, ny);
+  const sym = symbolAt(p, slotCards, active, w, nx, ny, trashDiscards);
   if (!sym) return { kind: 'moved', walk: { ...w, x: nx, y: ny, steps: w.steps + 1 } };
 
   const r = stepSymbol(MESA_PDA, w.cfg, sym);
@@ -291,7 +311,14 @@ export function move(p: Parsed, slotCards: (Card | null)[], active: number, w: W
     const stackCards = [...w.stackCards, card];
     return {
       kind: 'moved',
-      walk: { ...base, stackCards, picked: [...w.picked, slot], maxDepth: Math.max(w.maxDepth, stackCards.length) },
+      walk: {
+        ...base,
+        stackCards,
+        stackSlots: [...w.stackSlots, slot],
+        pushedCards: [...w.pushedCards, card],
+        picked: [...w.picked, slot],
+        maxDepth: Math.max(w.maxDepth, stackCards.length),
+      },
       event: { symbol: 'a', trace: r.trace, slot, card },
     };
   }
@@ -301,8 +328,28 @@ export function move(p: Parsed, slotCards: (Card | null)[], active: number, w: W
     const delivered = [...w.delivered, { card, depthBelow, door: k }];
     return {
       kind: 'moved',
-      walk: { ...base, stackCards: w.stackCards.slice(0, -1), delivered, usedDoors: { ...w.usedDoors, [k]: delivered.length - 1 } },
+      walk: {
+        ...base,
+        stackCards: w.stackCards.slice(0, -1),
+        stackSlots: w.stackSlots.slice(0, -1),
+        delivered,
+        usedDoors: { ...w.usedDoors, [k]: delivered.length - 1 },
+      },
       event: { symbol: 'b', trace: r.trace, card, door: k, depthBelow },
+    };
+  }
+  if (sym === 'd') {
+    const card = w.stackCards[w.stackCards.length - 1];
+    const slot = w.stackSlots[w.stackSlots.length - 1];
+    return {
+      kind: 'moved',
+      walk: {
+        ...base,
+        stackCards: w.stackCards.slice(0, -1),
+        stackSlots: w.stackSlots.slice(0, -1),
+        picked: w.picked.filter((pickedSlot) => pickedSlot !== slot),
+      },
+      event: { symbol: 'd', trace: r.trace, slot, card },
     };
   }
   return { kind: 'moved', walk: { ...base, done: true }, event: { symbol: 'c', trace: r.trace } };
@@ -314,15 +361,16 @@ export function available(w: Walk): Record<Symbol3, boolean> {
     a: stepSymbol(MESA_PDA, w.cfg, 'a').ok,
     b: stepSymbol(MESA_PDA, w.cfg, 'b').ok,
     c: stepSymbol(MESA_PDA, w.cfg, 'c').ok,
+    d: stepSymbol(MESA_PDA, w.cfg, 'd').ok,
   };
 }
 
 /** Beco sem saída: há mais cartas na pilha do que portas/vagas para entregá-las. */
-export function isStuck(p: Parsed, w: Walk): boolean {
+export function isStuck(p: Parsed, w: Walk, trashDiscards = 0): boolean {
   if (w.done) return false;
   const unused = p.doors.filter((d) => !(key(d.x, d.y) in w.usedDoors)).length;
   const room = Math.min(HAND_MAX - w.delivered.length, unused);
-  return w.stackCards.length > room;
+  return w.stackCards.length > room && !(trashDiscards > 0 && w.stackCards.length > 0);
 }
 
 export function activeSlotCount(p: Parsed, handSize: number): number {
@@ -336,7 +384,7 @@ export function replayStacks(script: string, pushed: Card[]): Card[][] {
   let k = 0;
   for (const ch of script) {
     if (ch === 'a') st = [...st, pushed[k++]];
-    else if (ch === 'b') st = st.slice(0, -1);
+    else if (ch === 'b' || ch === 'd') st = st.slice(0, -1);
     out.push(st);
   }
   return out;
@@ -346,7 +394,15 @@ export function replayStacks(script: string, pushed: Card[]): Card[][] {
  * Menor caminho até (tx, ty) sem pisar em tiles de evento no meio do trajeto
  * (só o destino pode ser um evento). Usado pelo clique no mapa.
  */
-export function pathTo(p: Parsed, slotCards: (Card | null)[], active: number, w: Walk, tx: number, ty: number): Dir[] | null {
+export function pathTo(
+  p: Parsed,
+  slotCards: (Card | null)[],
+  active: number,
+  w: Walk,
+  tx: number,
+  ty: number,
+  trashDiscards = 0,
+): Dir[] | null {
   const prev = new Map<string, { from: string; dir: Dir } | null>([[key(w.x, w.y), null]]);
   const q: Pt[] = [{ x: w.x, y: w.y }];
   const goal = key(tx, ty);
@@ -358,7 +414,7 @@ export function pathTo(p: Parsed, slotCards: (Card | null)[], active: number, w:
       const ny = c.y + DIRS[dir][1];
       const nk = key(nx, ny);
       if (nx < 0 || ny < 0 || nx >= p.w || ny >= p.h || p.wall[ny][nx] || prev.has(nk)) continue;
-      if (nk !== goal && symbolAt(p, slotCards, active, w, nx, ny)) continue;
+      if (nk !== goal && symbolAt(p, slotCards, active, w, nx, ny, trashDiscards)) continue;
       prev.set(nk, { from: key(c.x, c.y), dir });
       q.push({ x: nx, y: ny });
     }

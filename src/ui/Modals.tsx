@@ -26,6 +26,7 @@ export function Modal({ title, onClose, children, wide, className = '' }: { titl
 export const EXAMPLES: { script: string; title: string; story: string }[] = [
   { script: 'aabbc', title: 'Duas cartas, duas portas', story: 'Capri pega 2 cartas, entrega as 2 (a última pega é a primeira entregue) e cruza o portal. Pilha vazia no fim: ACEITA.' },
   { script: 'ababc', title: 'Pega e entrega, uma a uma', story: 'Pega, entrega, pega, entrega: a pilha nunca passa de 1 carta. ACEITA, mas rende pouco multiplicador de profundidade.' },
+  { script: 'aadbc', title: 'Descarta e repõe', story: 'Pega duas cartas, descarta a última no lixo (d), entrega a que ficou e cruza o portal. A vaga descartada recebe outra carta.' },
   { script: 'abbc', title: 'Porta sem carta', story: 'Capri tenta entregar uma 2ª carta com a pilha vazia: não existe δ(q1, b, Z). REJEITADA.' },
   { script: 'aabc', title: 'Portal com carta na pilha', story: 'Sobrou uma carta na pilha: o portal exige o topo Z₀ e o autômato não tem δ(q1, c, X). REJEITADA.' },
   { script: 'aaaaaabbbbbbc', title: 'Mão cheia (6 cartas)', story: 'O estado só conta até q5: com 5 cartas entregues não há δ(q5, b, X). REJEITADA — a mão máxima é 5.' },
@@ -41,7 +42,7 @@ function downloadJff() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Laboratório: digite um roteiro (letras a/b/c) e veja o autômato processá-lo passo a passo. */
+/** Laboratório: digite um roteiro (letras a/b/c/d) e veja o autômato processá-lo passo a passo. */
 export function ScriptLab({ initial = 'aabbc' }: { initial?: string }) {
   const [text, setText] = useState(initial);
   const [step, setStep] = useState(-1);
@@ -71,7 +72,7 @@ export function ScriptLab({ initial = 'aabbc' }: { initial?: string }) {
   return (
     <div className="lab">
       <div className="lab-in">
-        <label htmlFor="roteiro">Roteiro (letras a, b, c):</label>
+        <label htmlFor="roteiro">Roteiro (letras a, b, c, d):</label>
         <input id="roteiro" value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} autoComplete="off" maxLength={40} />
         <button className="btn primary" onClick={() => { setStep(-1); setAuto(true); }}>▶ Executar</button>
         <button className="btn" onClick={() => setStep((s) => Math.min(n - 1, s + 1))} disabled={finished}>Passo →</button>
@@ -123,8 +124,9 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
         <ul>
           <li>Pisar numa <b>carta</b> = símbolo <b>a</b> (PUSH X): a carta vai para o <b>topo da pilha</b>. Pisar é obrigatório: não dá para passar por cima de uma carta.</li>
           <li>Pisar numa <b>porta</b> = símbolo <b>b</b> (POP X): sai a carta do <b>topo</b> da pilha e vai para a sua mão. Cada porta abre uma vez. Sem carta na pilha, a porta fica trancada.</li>
+          <li>Pisar no <b>lixo</b> = símbolo <b>d</b> (POP X): descarta a carta do topo e repõe a vaga com uma carta nova. Há <b>4 descartes por mesa</b>, compartilhados entre todas as mãos; só é possível descartar com carta na pilha e reposição disponível.</li>
           <li>O <b>portal</b> = símbolo <b>c</b>: só abre com a <b>pilha vazia</b> e ao menos 1 carta entregue. Chegar nele = o PDA <b>aceita</b> e a mão é jogada.</li>
-          <li>A pilha é <b>LIFO</b>: a última carta que você pegou é a primeira a ser entregue. Planeje a ordem!</li>
+          <li>A pilha é <b>LIFO</b>: a última carta que você pegou é a primeira a ser entregue ou descartada. Planeje a ordem!</li>
           <li>Cada entrega rende <b>+10 fichas</b>. Quanto <b>mais funda</b> a pilha chegou, maior o multiplicador final: <b>×(1 + 0,5 × profundidade)</b>.</li>
           <li>A <b>Carta Fundo de Pilha</b> dá +3 mult por carta que ainda estava embaixo dela ao ser entregue.</li>
           <li>Sem saída? <b>Z</b> desfaz a última ação, <b>R</b> reinicia o percurso (de graça).</li>
@@ -167,8 +169,9 @@ export function AutomatonModal({ onClose }: { onClose: () => void }) {
           </ul>
           <p className="muted">
             Convenção: o primeiro símbolo à esquerda do que é empilhado vira o topo da pilha. O estado <code>qi</code> conta quantas cartas já foram entregues
-            (memória finita, máx. 5); a pilha guarda as cartas ainda não entregues. Linguagem: palavras de parênteses balanceados (a abre, b fecha) com 1 a 5
-            pares, seguidas de <code>c</code>. O módulo é independente da interface: <code>src/pda/pda.ts</code> e <code>src/pda/mesaPda.ts</code>.
+            (memória finita, máx. 5); <code>d</code> também desempilha, mas descarta a carta em vez de entregá-la. Linguagem: sequências balanceadas de <code>a</code>,
+            <code>b</code> e <code>d</code>, com 1 a 5 entregas <code>b</code>, seguidas de <code>c</code>. O limite de quatro descartes por mesa é uma regra do jogo.
+            O módulo é independente da interface: <code>src/pda/pda.ts</code> e <code>src/pda/mesaPda.ts</code>.
           </p>
         </>
       )}

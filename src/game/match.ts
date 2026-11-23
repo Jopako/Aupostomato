@@ -6,6 +6,7 @@ import { getLayout, Walk } from './maze';
 
 export const BASE_HANDS = 4;
 export const BASE_DISCARDS = 3;
+export const BASE_TRASH_DISCARDS = 4;
 export const BASE_HAND_SIZE = 8;
 export const MAX_PLAY = 5;
 export const HAND_LEFT_BONUS = 15;
@@ -34,6 +35,7 @@ export interface MatchState {
   score: number;
   handsLeft: number;
   discardsLeft: number;
+  trashDiscardsLeft: number;
   handSize: number;
   layoutId: string;
   drawPile: Card[];
@@ -91,6 +93,7 @@ export function startMatch(cfg: MatchConfig, rng: Rng = Math.random): MatchState
     score: 0,
     handsLeft: lim.hands,
     discardsLeft: lim.discards,
+    trashDiscardsLeft: BASE_TRASH_DISCARDS,
     handSize: lim.handSize,
     layoutId,
     drawPile: d.drawPile,
@@ -176,6 +179,34 @@ export function redeal(m: MatchState, rng: Rng = Math.random): MatchState {
   if (m.discardsLeft <= 0) throw new Error('sem descartes');
   const d = deal(m.drawPile, [...m.discardPile, ...m.hand], dealSize(m.layoutId, m.handSize), rng);
   return { ...m, discardsLeft: m.discardsLeft - 1, hand: d.hand, drawPile: d.drawPile, discardPile: d.discardPile };
+}
+
+/** Descarta uma carta do mapa e repõe sua vaga, consumindo um descarte da mesa. */
+export function discardMapCard(m: MatchState, slot: number, rng: Rng = Math.random): MatchState {
+  if (m.status !== 'playing') throw new Error('mesa encerrada');
+  if (m.trashDiscardsLeft <= 0) throw new Error('sem descartes de carta');
+  const discarded = m.hand[slot];
+  if (!discarded) throw new Error('carta do mapa inválida');
+
+  let drawPile = m.drawPile.slice();
+  let discardPile = m.discardPile.slice();
+  if (drawPile.length === 0) {
+    drawPile = shuffle(discardPile, rng);
+    discardPile = [];
+  }
+  const replacement = drawPile.shift();
+  if (!replacement) throw new Error('não há cartas disponíveis para reposição');
+
+  const hand = m.hand.slice();
+  hand[slot] = replacement;
+  discardPile.push(discarded);
+  return {
+    ...m,
+    hand,
+    drawPile,
+    discardPile,
+    trashDiscardsLeft: m.trashDiscardsLeft - 1,
+  };
 }
 
 export function matchPayout(m: MatchState): { base: number; handsBonus: number; gold: number; relics: number; total: number } {

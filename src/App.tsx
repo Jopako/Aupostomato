@@ -351,7 +351,6 @@ export default function App() {
         <MatchView
           opponent={matchInit.opp}
           initial={matchInit.state}
-          money={ctx.run.money}
           onEnd={onMatchEnd}
           onHelp={() => setModal('help')}
           onAuto={() => setModal('auto')}

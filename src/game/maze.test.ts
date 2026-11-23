@@ -3,7 +3,7 @@ import { LAYOUTS, activeSlotCount, getLayout, isStuck, move, newWalk, parseLayou
 import { Card, createDeck, shuffle } from './cards';
 import { search } from './solver';
 import { MESA_PDA, inMesaLanguage } from '../pda/mesaPda';
-import { isAccepting, runPDA } from '../pda/pda';
+import { isAccepting, runPDA, stepSymbol } from '../pda/pda';
 
 const cards = (n: number): Card[] => shuffle(createDeck()).slice(0, n);
 
@@ -34,6 +34,8 @@ describe('mapas', () => {
         }
       }
       expect(seen.has(`${p.portal.x},${p.portal.y}`)).toBe(true);
+      expect(seen.has(`${p.trash.x},${p.trash.y}`)).toBe(true);
+      expect(l.rows.flatMap((row) => [...row]).filter((ch) => ch === 'T')).toHaveLength(1);
       for (const s of p.slots) expect(seen.has(`${s.x},${s.y}`)).toBe(true);
       for (const d of p.doors) expect(seen.has(`${d.x},${d.y}`)).toBe(true);
     });
@@ -93,7 +95,35 @@ describe('motor de percurso', () => {
     expect(symbolAt(p, cs, 8, w, p.portal.x, p.portal.y)).toBe('c');
     expect(symbolAt(p, cs, 8, w, p.doors[0].x, p.doors[0].y)).toBe('b');
     expect(symbolAt(p, cs, 8, w, p.slots[0].x, p.slots[0].y)).toBe('a');
+    expect(symbolAt(p, cs, 8, w, p.trash.x, p.trash.y, 1)).toBeNull();
     expect(symbolAt(p, cs, 8, w, p.start.x, p.start.y)).toBeNull();
     expect(isStuck(p, w)).toBe(false);
+  });
+  it('o lixo lê d, remove o topo sem entregar e libera a vaga da carta descartada', () => {
+    const pushed = stepSymbol(MESA_PDA, newWalk(p).cfg, 'a');
+    expect(pushed.ok).toBe(true);
+    if (!pushed.ok) return;
+    const w: Walk = {
+      ...newWalk(p),
+      x: p.trash.x - 1,
+      y: p.trash.y,
+      cfg: pushed.next,
+      stackCards: [cs[0]],
+      stackSlots: [0],
+      pushedCards: [cs[0]],
+      picked: [0],
+      script: 'a',
+      trace: [pushed.trace],
+      maxDepth: 1,
+    };
+    const r = move(p, cs, 8, w, 'right', 1);
+    expect(r.kind).toBe('moved');
+    if (r.kind !== 'moved') return;
+    expect(r.event?.symbol).toBe('d');
+    expect(r.walk.stackCards).toHaveLength(0);
+    expect(r.walk.stackSlots).toHaveLength(0);
+    expect(r.walk.delivered).toHaveLength(0);
+    expect(r.walk.picked).toHaveLength(0);
+    expect(r.walk.script).toBe('ad');
   });
 });

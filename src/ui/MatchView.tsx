@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, rankLabel, SUIT_GLYPH } from '../game/cards';
-import { MatchState, MAX_PLAY, playRound, redeal } from '../game/match';
+import { discardMapCard, MatchState, MAX_PLAY, playRound, redeal } from '../game/match';
 import { available, Dir, isStuck, move, newWalk, pathTo, replayStacks, Walk, getLayout } from '../game/maze';
 import { describeRules, OpponentDef } from '../game/opponents';
 import { HAND_NAME, HAND_TYPES, handValue } from '../game/poker';
@@ -20,6 +20,11 @@ interface Anim {
   pushed: Card[];
   stage: 'pda' | 'score' | 'total';
   i: number;
+}
+
+interface HistoryEntry {
+  walk: Walk;
+  match: MatchState;
 }
 
 export function running(events: ScoreEvent[], upTo: number) {
@@ -60,7 +65,6 @@ const KEYS: Record<string, Dir> = { w: 'up', a: 'left', s: 'down', d: 'right', a
 interface Props {
   opponent: OpponentDef;
   initial: MatchState;
-  money: number;
   showTutorial: boolean;
   onEnd: (m: MatchState) => void;
   onHelp: () => void;
@@ -76,7 +80,7 @@ const GUIDE_STEPS = [
   },
   {
     title: '2. Entregue pelas portas',
-    text: 'Cada porta lê b (POP): tira a carta do topo da pilha e a entrega à sua mão. A última carta que você pegou é a primeira entregue. A ordem não muda a categoria de poker (par, flush etc.), mas afeta os bônus ligados à profundidade da pilha.',
+    text: 'Cada porta lê b (POP): tira a carta do topo da pilha e a entrega à sua mão. O lixo lê d: descarta essa carta e repõe a vaga com outra do baralho. Você tem 4 descartes para dividir entre todas as mãos da mesa.',
   },
   {
     title: '3. Saia pelo portal',
@@ -84,11 +88,11 @@ const GUIDE_STEPS = [
   },
 ];
 
-export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHelp, onAuto, onForfeit, onTutorialDone }: Props) {
+export function MatchView({ opponent, initial, showTutorial, onEnd, onHelp, onAuto, onForfeit, onTutorialDone }: Props) {
   const [m, setM] = useState<MatchState>(initial);
   const layout = getLayout(m.layoutId);
   const [walk, setWalk] = useState<Walk>(() => newWalk(getLayout(initial.layoutId)));
-  const [hist, setHist] = useState<Walk[]>([]);
+  const [hist, setHist] = useState<HistoryEntry[]>([]);
   const [blocked, setBlocked] = useState<string | null>(null);
   const [shake, setShake] = useState(0);
   const [anim, setAnim] = useState<Anim | null>(null);
@@ -118,7 +122,9 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
     const { m: mm, walk: w, anim: an } = live.current;
     if (an || mm.status !== 'playing') return;
     const p = getLayout(mm.layoutId);
-    const r = move(p, mm.hand, mm.hand.length, w, dir);
+    const hasReplacement = mm.drawPile.length > 0 || mm.discardPile.length > 0;
+    const trashDiscards = hasReplacement ? mm.trashDiscardsLeft : 0;
+    const r = move(p, mm.hand, mm.hand.length, w, dir, trashDiscards);
     if (r.kind === 'wall' || r.kind === 'done') return;
     if (r.kind === 'blocked') {
       queue.current = [];
@@ -129,8 +135,13 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
     }
     setBlocked(null);
     if (r.event) {
-      setHist((h) => [...h, w]);
-      r.event.symbol === 'a' ? sfx.push() : r.event.symbol === 'b' ? sfx.pop() : sfx.accept();
+      setHist((h) => [...h, { walk: w, match: mm }]);
+      if (r.event.symbol === 'd' && r.event.slot !== undefined) {
+        const nextMatch = discardMapCard(mm, r.event.slot);
+        setM(nextMatch);
+        live.current = { ...live.current, m: nextMatch };
+      }
+      r.event.symbol === 'a' ? sfx.push() : r.event.symbol === 'b' || r.event.symbol === 'd' ? sfx.pop() : sfx.accept();
     }
     setWalk(r.walk);
   }, []);
@@ -148,7 +159,10 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
     const { hist: h, anim: an } = live.current;
     if (an || h.length === 0) return;
     queue.current = [];
-    setWalk(h[h.length - 1]);
+    const previous = h[h.length - 1];
+    setWalk(previous.walk);
+    setM(previous.match);
+    live.current = { ...live.current, m: previous.match, walk: previous.walk };
     setHist(h.slice(0, -1));
     setBlocked(null);
     sfx.click();
@@ -160,7 +174,7 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
     sfx.click();
   }, [resetWalk]);
 
-  const finish = (a: Anim) => {
+  const finish = useCallback((a: Anim) => {
     setM(a.next);
     setAnim(null);
     resetWalk(a.next);
@@ -169,18 +183,22 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
       a.next.status === 'won' ? sfx.win() : sfx.lose();
       setTimeout(() => onEnd(a.next), 900);
     }
-  };
+  }, [onEnd, resetWalk]);
 
   const doPlay = useCallback(() => {
     const { m: mm, walk: w, anim: an } = live.current;
-    if (an || !w.done) return;
+    if (an) {
+      if (an.stage === 'total') finish(an);
+      return;
+    }
+    if (!w.done) return;
     try {
       const { state, result } = playRound(mm, w);
-      setAnim({ result, next: state, walk: w, pushed: w.picked.map((s) => mm.hand[s]), stage: 'pda', i: -1 });
+      setAnim({ result, next: state, walk: w, pushed: w.pushedCards, stage: 'pda', i: -1 });
     } catch (e) {
       setBlocked((e as Error).message);
     }
-  }, []);
+  }, [finish]);
 
   const doRedeal = () => {
     if (anim || m.discardsLeft <= 0 || m.status !== 'playing') return;
@@ -206,6 +224,7 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
         queue.current = [];
         step(dir);
       } else if (k === 'enter') {
+        e.preventDefault();
         doPlay();
       } else if (k === 'z' || k === 'backspace') {
         undo();
@@ -219,7 +238,8 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
 
   const onTile = (x: number, y: number) => {
     if (anim || walk.done) return;
-    const path = pathTo(layout, cards, active, walk, x, y);
+    const canReplace = m.drawPile.length > 0 || m.discardPile.length > 0;
+    const path = pathTo(layout, cards, active, walk, x, y, canReplace ? m.trashDiscardsLeft : 0);
     if (path && path.length) queue.current = path;
   };
 
@@ -229,7 +249,7 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
     const { result, stage, i, walk: w } = anim;
     const nTr = w.trace.length;
     const nEv = result.events.length;
-    let t: ReturnType<typeof setTimeout>;
+    let t: ReturnType<typeof setTimeout> | undefined;
     if (stage === 'pda') {
       if (i < nTr - 1) {
         t = setTimeout(() => {
@@ -250,10 +270,10 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
           setAnim({ ...anim, i: i + 1 });
         }, i < 0 ? 500 : 400);
       } else t = setTimeout(() => setAnim({ ...anim, stage: 'total' }), 450);
-    } else {
-      t = setTimeout(() => finish(anim), 1300);
     }
-    return () => clearTimeout(t);
+    return () => {
+      if (t) clearTimeout(t);
+    };
   }, [anim]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const estimate = useMemo(() => {
@@ -267,8 +287,13 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
     });
   }, [walk, m]);
 
-  const can = useMemo(() => available(walk), [walk]);
-  const stuck = isStuck(layout, walk);
+  const availableSymbols = useMemo(() => available(walk), [walk]);
+  const canReplace = m.drawPile.length > 0 || m.discardPile.length > 0;
+  const can = {
+    ...availableSymbols,
+    d: availableSymbols.d && m.trashDiscardsLeft > 0 && canReplace,
+  };
+  const stuck = isStuck(layout, walk, can.d ? m.trashDiscardsLeft : 0);
   const shownScore = anim && anim.stage === 'total' ? anim.next.score : m.score;
   const pct = Math.min(100, (shownScore / m.target) * 100);
   const tally = anim ? running(anim.result.events, anim.stage === 'pda' ? -1 : anim.stage === 'total' ? anim.result.events.length - 1 : anim.i) : null;
@@ -347,8 +372,7 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
         <div className="counters">
           <div><b>{m.handsLeft}</b><span>mãos</span></div>
           <div><b>{m.discardsLeft}</b><span>mapas novos</span></div>
-          <div><b>{m.drawPile.length}</b><span>baralho</span></div>
-          <div><b>${money}</b><span>dinheiro</span></div>
+          <div><b>{m.trashDiscardsLeft}</b><span>descartes de carta</span></div>
         </div>
       </header>
 
@@ -408,7 +432,7 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
         )}
         <section className="play-col">
           {anim && anim.stage !== 'pda' ? (
-            <div className="scoring" onClick={() => finish(anim)} title="Clique para pular" role="status" aria-live="polite">
+            <div className="scoring" role="status" aria-live="polite">
               <div className="played">
                 {anim.walk.delivered.map((d) => (
                   <CardView key={d.card.id} card={d.card} small scoring={anim.result.scoring.some((s) => s.id === d.card.id)} />
@@ -439,7 +463,11 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
                   </li>
                 ))}
               </ul>
-              <div className="muted skip">clique para pular ▸▸</div>
+              {anim.stage === 'total' ? (
+                <button className="btn primary" onClick={() => finish(anim)}>Próxima mão ▶ (Enter)</button>
+              ) : (
+                <div className="muted skip">Acompanhe a execução do autômato e a pontuação…</div>
+              )}
             </div>
           ) : (
             <>
@@ -453,7 +481,7 @@ export function MatchView({ opponent, initial, money, showTutorial, onEnd, onHel
                 </div>
               </div>
               <div className="map-legend muted">
-                <span className="lg card">carta</span> = a (PUSH) · <span className="lg door">porta</span> = b (POP: entrega) · <span className="lg portal">portal</span> = c (pilha vazia)
+                <span className="lg card">carta</span> = a (PUSH) · <span className="lg door">porta</span> = b (entrega) · <span className="lg trash">lixo</span> = d (descarta) · <span className="lg portal">portal</span> = c
               </div>
             </>
           )}

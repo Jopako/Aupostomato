@@ -20,8 +20,8 @@ describe('definição do PDA da mesa', () => {
     expect(MESA_PDA.states.length).toBeGreaterThanOrEqual(5);
     expect(MESA_PDA.states.length).toBeLessThanOrEqual(10);
   });
-  it('tem 5×3 + 5 = 20 transições, todas determinísticas', () => {
-    expect(MESA_PDA.transitions).toHaveLength(HAND_MAX * 3 + HAND_MAX);
+  it('tem as transições de cartas, portas, descartes e portal, todas determinísticas', () => {
+    expect(MESA_PDA.transitions).toHaveLength(HAND_MAX * 3 + HAND_MAX + HAND_MAX + 1);
     const keys = MESA_PDA.transitions.map((t) => `${t.from}|${t.read}|${t.pop}`);
     expect(new Set(keys).size).toBe(keys.length);
     expect(MESA_PDA.transitions.every((t) => t.read !== null)).toBe(true);
@@ -29,23 +29,23 @@ describe('definição do PDA da mesa', () => {
 });
 
 describe('linguagem', () => {
-  it('stepSymbol concorda com o predicado em TODAS as palavras de até 12 símbolos de {a,b,c}', () => {
-    const alpha = ['a', 'b', 'c'];
+  it('stepSymbol concorda com o predicado em todas as palavras de até 8 símbolos de {a,b,c,d}', () => {
+    const alpha = ['a', 'b', 'c', 'd'];
     let checked = 0;
     const rec = (w: string) => {
       expect(runSteps(w).accepted, `"${w}"`).toBe(inMesaLanguage(w));
       checked++;
-      if (w.length === 12) return;
+      if (w.length === 8) return;
       for (const ch of alpha) rec(w + ch);
     };
     rec('');
-    expect(checked).toBe((3 ** 13 - 1) / 2);
+    expect(checked).toBe((4 ** 9 - 1) / 3);
   });
-  it('runPDA (DFS) concorda com o predicado em todas as palavras de até 8 símbolos', () => {
-    const alpha = ['a', 'b', 'c'];
+  it('runPDA (DFS) concorda com o predicado em todas as palavras de até 7 símbolos', () => {
+    const alpha = ['a', 'b', 'c', 'd'];
     const rec = (w: string) => {
       expect(runPDA(MESA_PDA, w.split('')).accepted, `"${w}"`).toBe(inMesaLanguage(w));
-      if (w.length === 8) return;
+      if (w.length === 7) return;
       for (const ch of alpha) rec(w + ch);
     };
     rec('');
@@ -53,6 +53,8 @@ describe('linguagem', () => {
   it('exemplos da interface', () => {
     expect(runSteps('aabbc').accepted).toBe(true);
     expect(runSteps('ababc').accepted).toBe(true);
+    expect(runSteps('aadbc').accepted).toBe(true);
+    expect(runSteps('adbc').accepted).toBe(false);
     expect(runSteps('aaaaabbbbbc').accepted).toBe(true);
     expect(runSteps('abbc').accepted).toBe(false);
     expect(runSteps('aabc').accepted).toBe(false);
@@ -85,14 +87,15 @@ describe('mensagens', () => {
 });
 
 describe('exportação JFLAP', () => {
-  it('gera um .jff com 7 estados e 20 transições, inicial e final', () => {
+  it('gera um .jff com 7 estados e todas as transições, inicial e final', () => {
     const x = toJFF(MESA_PDA);
     expect(x).toContain('<type>pda</type>');
     expect((x.match(/<state /g) ?? []).length).toBe(7);
-    expect((x.match(/<transition>/g) ?? []).length).toBe(20);
+    expect((x.match(/<transition>/g) ?? []).length).toBe(HAND_MAX * 3 + HAND_MAX + HAND_MAX + 1);
     expect((x.match(/<initial\/>/g) ?? []).length).toBe(1);
     expect((x.match(/<final\/>/g) ?? []).length).toBe(1);
     expect(x).toContain('<read>a</read>');
+    expect(x).toContain('<read>d</read>');
     expect(x).toContain('<pop>Z</pop>');
     expect(x).toContain('<push>XZ</push>');
     expect(x).toContain('<push/>');

@@ -8,13 +8,13 @@ interface Props {
   cards: (Card | null)[];
   active: number;
   walk: Walk;
-  can: { a: boolean; b: boolean; c: boolean };
+  can: { a: boolean; b: boolean; c: boolean; d: boolean };
   shake: number;
   debuffed: (c: Card) => boolean;
   onTile: (x: number, y: number) => void;
 }
 
-/** O mapa: carta = PUSH (a), porta = POP (b), portal = fim (c). */
+/** O mapa: carta = PUSH (a), porta = POP (b), lixo = POP (d), portal = fim (c). */
 export function MapView({ layout: p, cards, active, walk, can, shake, debuffed, onTile }: Props) {
   const tiles = [];
   for (let y = 0; y < p.h; y++) {
@@ -33,6 +33,12 @@ export function MapView({ layout: p, cards, active, walk, can, shake, debuffed, 
           cls += ` cardtile ${isRed(c.suit) ? 'red' : 'black'} ${can.a ? '' : 'locked'} ${debuffed(c) ? 'debuff' : ''} ${c.enh ? 'enh-' + c.enh : ''}`;
           content = <><b>{rankLabel(c.rank)}</b><SuitIcon suit={c.suit} size={0.5} /></>;
           title = `Carta ${rankLabel(c.rank)}${SUIT_GLYPH[c.suit]} — pisar = símbolo a (PUSH X)`;
+        } else if (x === p.trash.x && y === p.trash.y) {
+          cls += ` trash ${can.d ? 'ready' : 'locked'}`;
+          content = '🗑';
+          title = can.d
+            ? 'Lixo — pisar descarta a carta do topo e revela uma carta nova'
+            : 'Lixo — precisa de uma carta na pilha, descartes restantes e cartas no baralho';
         } else if (p.doorSet.has(k)) {
           const used = k in walk.usedDoors;
           cls += ` door ${used ? 'open' : can.b ? 'ready' : 'locked'}`;

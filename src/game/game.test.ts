@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { Card, createDeck, shuffle } from './cards';
 import { evaluate, handValue } from './poker';
 import { scoreHand } from './scoring';
-import { dealSize, matchLimits, matchPayout, playRound, redeal, startMatch } from './match';
+import { dealSize, discardMapCard, matchLimits, matchPayout, playRound, redeal, startMatch } from './match';
 import { search } from './solver';
 import { activeSlotCount, getLayout, Walk } from './maze';
 import { OPPONENTS, effectiveRules } from './opponents';
@@ -156,9 +156,11 @@ describe('mesa', () => {
     let m = startMatch(cfg(), Math.random);
     expect(m.hand).toHaveLength(8);
     expect(m.drawPile).toHaveLength(44);
+    expect(m.trashDiscardsLeft).toBe(4);
     m = redeal(m);
     expect(m.hand).toHaveLength(8);
     expect(m.discardsLeft).toBe(2);
+    expect(m.trashDiscardsLeft).toBe(4);
     let guard = 0;
     while (m.status === 'playing' && guard++ < 10) {
       const r = playRound(m, anyWalk(m), Math.random);
@@ -167,6 +169,23 @@ describe('mesa', () => {
     }
     expect(['won', 'lost']).toContain(m.status);
     expect(m.handsPlayed).toBeLessThanOrEqual(4);
+  });
+  it('descarta uma carta do mapa, repõe a mesma vaga e compartilha quatro usos pela mesa', () => {
+    let m = startMatch(cfg(), () => 0.3);
+    const old = m.hand[0];
+    m = discardMapCard(m, 0, () => 0.3);
+    expect(m.hand[0].id).not.toBe(old.id);
+    expect(m.discardPile.map((card) => card.id)).toContain(old.id);
+    expect(m.trashDiscardsLeft).toBe(3);
+    expect(playRound(m, anyWalk(m)).state.trashDiscardsLeft).toBe(3);
+
+    for (let i = 0; i < 3; i++) m = discardMapCard(m, 0, () => 0.3);
+    expect(m.trashDiscardsLeft).toBe(0);
+    expect(() => discardMapCard(m, 0)).toThrow('sem descartes');
+    expect(redeal(m).trashDiscardsLeft).toBe(0);
+    const allCards = [...m.hand, ...m.drawPile, ...m.discardPile];
+    expect(new Set(allCards.map((card) => card.id)).size).toBe(allCards.length);
+    expect(allCards).toHaveLength(run.deck.length);
   });
   it('validações', () => {
     const m = startMatch(cfg(), Math.random);

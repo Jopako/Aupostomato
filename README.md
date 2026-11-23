@@ -14,9 +14,9 @@ Você controla **Capri**, condenado a disputar mesas para pagar uma dívida ao T
 2. Pise em uma carta para executar `a` e empilhar a carta.
 3. Pise em uma porta para executar `b` e retirar a carta do topo da pilha para a mão de poker.
 4. Chegue ao portal com a pilha vazia para executar `c` e aceitar o percurso.
-5. Pressione **Enter** para jogar a mão formada.
+5. Pressione **Enter** para jogar a mão formada. Acompanhe a execução do PDA e a animação da pontuação; quando o total aparecer, pressione **Enter** novamente (ou clique em **Próxima mão**) para continuar.
 
-O jogador pode entregar até cinco cartas por mão. É possível desfazer o último movimento com **Z** ou **Backspace**, reiniciar o percurso com **R** e solicitar uma nova distribuição com o botão de descarte.
+O jogador pode entregar até cinco cartas por mão. Em cada mapa há um **lixo**: pise nele com uma carta na pilha para descartá-la e receber uma carta nova na vaga correspondente. A mesa começa com **4 descartes de carta**, compartilhados entre todas as mãos; eles não são renovados ao iniciar outro mapa. É possível desfazer o último movimento com **Z** ou **Backspace**, reiniciar o percurso com **R** e solicitar uma nova distribuição com o botão de novo mapa.
 
 Cada entrega rende **10 fichas**. Depois, a mão de poker soma fichas e multiplicadores das cartas, relíquias, nível das combinações e bônus das regras da mesa. Ao aceitar o percurso, o autômato aplica um multiplicador baseado na profundidade máxima alcançada pela pilha:
 
@@ -50,7 +50,7 @@ O PDA é implementado independentemente da interface em `src/pda/pda.ts` e `src/
 P = (Q, Σ, Γ, δ, q0, Z, F)
 
 Q = {q0, q1, q2, q3, q4, q5, qf}
-Σ = {a, b, c}
+Σ = {a, b, c, d}
 Γ = {X, Z}
 q0 = estado inicial
 Z  = símbolo inicial da pilha
@@ -59,6 +59,7 @@ F = {qf}
 
 - **`a`** representa pisar em uma carta: empilha `X`.
 - **`b`** representa pisar em uma porta: desempilha `X` e entrega uma carta à mão.
+- **`d`** representa pisar no lixo: desempilha `X`, descarta a carta e repõe a vaga com uma nova carta.
 - **`c`** representa entrar no portal: só ocorre com o símbolo inicial `Z` no topo, indicando pilha vazia.
 
 Os estados `qi` indicam quantas cartas foram entregues, chegando de `q0` até `q5`. A pilha contém as cartas coletadas mas ainda não entregadas.
@@ -69,24 +70,25 @@ As principais transições são:
 δ(qi, a, Z) = (qi, XZ)     0 ≤ i ≤ 4
 δ(qi, a, X) = (qi, XX)     0 ≤ i ≤ 4
 δ(qi, b, X) = (q(i+1), ε)  0 ≤ i ≤ 4
+δ(qi, d, X) = (qi, ε)      0 ≤ i ≤ 5
 δ(qi, c, Z) = (qf, Z)      1 ≤ i ≤ 5
 ```
 
-A linguagem aceita é composta por uma sequência balanceada de um a cinco pares `ab`, seguida de `c`:
+A linguagem aceita é composta por uma sequência balanceada de `a` (cartas), `b` (entregas) e `d` (descartes), com uma a cinco entregas `b`, seguida de `c`. O PDA controla a pilha; o limite de **4 descartes por mesa** é uma regra de jogo mantida entre as mãos:
 
 ```text
-abc, aabbc, ababc, aaabbbc, ...
+abc, aabbc, ababc, aadbc, ...
 ```
 
-Não são aceitos percursos com portas sem cartas empilhadas, fechamento do portal com cartas pendentes, mais de cinco entregas ou excesso de símbolos de fechamento.
+Não são aceitos percursos com portas ou lixo sem cartas empilhadas, fechamento do portal com cartas pendentes, mais de cinco entregas ou excesso de símbolos de fechamento.
 
-Durante o jogo, o mapa é interpretado como uma entrada do autômato. Movimentos que não possuem uma transição válida são bloqueados e exibidos como uma mensagem explicativa. O painel do PDA mostra o estado atual, o símbolo lido, as transições executadas e o conteúdo da pilha em tempo real.
+Durante o jogo, o mapa é interpretado como uma entrada do autômato. Movimentos que não possuem uma transição válida são bloqueados e exibidos como uma mensagem explicativa. O painel do PDA mostra o estado atual, o símbolo lido, as transições executadas e o conteúdo da pilha em tempo real. Descartes disponíveis são compartilhados entre as mãos da mesma mesa; desfazer um descarte também restaura a carta e o uso.
 
 A pilha segue a política **LIFO (último que entra, primeiro que sai)**: ao pisar em uma porta, sempre é entregue a carta mais recentemente empilhada.
 
 ### Laboratório do PDA
 
-Na tela inicial ou no painel **⚙ Autômato**, é possível abrir o laboratório. Digite um roteiro com `a`, `b` e `c`, por exemplo `aabbc`, e acompanhe cada configuração: estado, símbolo, transição e pilha.
+Na tela inicial ou no painel **⚙ Autômato**, é possível abrir o laboratório. Digite um roteiro com `a`, `b`, `c` e `d`, por exemplo `aadbc` (com descarte), e acompanhe cada configuração: estado, símbolo, transição e pilha.
 
 O laboratório informa se a palavra foi **aceita** ou **rejeitada** e explica o motivo da travar. Também permite baixar o autômato em formato JFLAP `.jff`.
 

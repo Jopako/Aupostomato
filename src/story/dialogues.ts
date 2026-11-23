@@ -419,7 +419,7 @@ export const DIALOGUES: Record<string, Dialogue> = {
         lines: [
           L('Cecília', 'Sente, Capri. Vou te lembrar das regras da casa, porque este ano elas mudaram.'),
           L('Cecília', 'Este ano a mão não fica na sua mão. As cartas ficam espalhadas pelo salão, e você anda até elas: WASD ou as setas.'),
-          L('Cecília', 'Pisar numa carta é "a": o Autômato a empilha. Pisar numa porta é "b": ele desempilha a carta do topo e ela vai para a sua mão. O portal é "c", e só abre com a pilha vazia.'),
+          L('Cecília', 'Pisar numa carta é "a": o Autômato a empilha. Pisar numa porta é "b": ele entrega o topo à sua mão. No lixo, "d" descarta o topo e repõe a vaga com outra carta. Você tem quatro descartes para a mesa inteira. O portal é "c", e só abre com a pilha vazia.'),
           L('Cecília', 'A pilha é LIFO: a última carta que você pegou é a primeira que sai. Monte a melhor mão de poker com as cartas entregues; a ordem não muda a combinação, mas a profundidade da pilha aumenta o multiplicador.'),
           L('Capri', 'E se eu me enrolar no caminho?'),
           L('Cecília', 'Z desfaz o último passo importante, R recomeça o percurso. E no botão Autômato você pode digitar roteiros e ver a máquina pensar. Boa sorte.'),
