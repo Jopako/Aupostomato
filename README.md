@@ -129,24 +129,4 @@ npm run sim -- 200 1 0
 
 Os argumentos representam, respectivamente, número de partidas, nível do empréstimo e quantidade de pistas.
 
-## Publicação no GitHub Pages
-
-O projeto inclui `.github/workflows/deploy.yml`. Para publicar:
-
-1. Envie o projeto para o repositório `aupostomato` na branch `main`.
-2. Em **Settings → Pages**, selecione **GitHub Actions** como fonte.
-3. O workflow executa os testes, gera o build e publica `dist/`.
-
-O caminho base é relativo, permitindo publicar em diferentes subdiretórios do GitHub Pages.
-
-## Estrutura do projeto
-
-```text
-src/pda/      definição e execução do PDA
-src/game/     cartas, poker, pontuação, mesas, loja e progressão
-src/story/    cenas, diálogos, pistas e efeitos narrativos
-src/ui/       telas, mapas, painel do PDA e renderização React
-scripts/      ferramentas de simulação de equilíbrio
-```
-
 O jogo usa salvamento automático no navegador e inclui testes e feedback visual para relacionar diretamente a teoria dos autômatos com as decisões da jogabilidade.
