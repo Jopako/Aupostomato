@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card } from '../game/cards';
 import { MatchState, matchPayout } from '../game/match';
 import { OpponentDef } from '../game/opponents';
@@ -11,29 +12,73 @@ export function TitleScreen({
 }: {
   onDev: () => void; hasSave: boolean; endings: number; onContinue: () => void; onNew: () => void; onHelp: () => void; onAuto: () => void; onCodex: () => void; onMute: () => void; muted: boolean; skipStory: boolean; onSkipStoryChange: (skip: boolean) => void;
 }) {
+  const [showNewGameOptions, setShowNewGameOptions] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   void isMuted;
   return (
     <div className="title-screen">
+      <button
+        type="button"
+        className="audio-toggle"
+        onClick={onMute}
+        aria-label={muted ? 'Ligar som' : 'Desligar som'}
+        aria-pressed={!muted}
+        title={muted ? 'Ligar som' : 'Desligar som'}
+      >
+        {muted ? (
+          <svg viewBox="0 0 32 32" shapeRendering="crispEdges" aria-hidden="true">
+            <path d="M3 12h7l10-8v24l-10-8H3z" />
+            <path d="M23 10l7 10M30 10l-7 10" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="square" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 32 32" shapeRendering="crispEdges" aria-hidden="true">
+            <path d="M3 12h7l10-8v24l-10-8H3z" />
+            <path d="M22 9h3v4h3v6h-3v4h-3v-4h3v-6h-3z" />
+            <path d="M27 5h3v4h2v14h-2v4h-3v-4h2V9h-2z" />
+          </svg>
+        )}
+      </button>
       <div className="suits" aria-hidden="true">♠ ♥ ♣ ♦</div>
       <h1 className="logo">Aupostomato</h1>
       <div className="title-menu">
-        {hasSave && <button className="btn primary big" onClick={onContinue}>Continuar</button>}
-        <button className={`btn big ${hasSave ? '' : 'primary'}`} onClick={onNew}>Novo jogo</button>
-        <label className="skip-story-option">
-          <input type="checkbox" checked={skipStory} onChange={(e) => onSkipStoryChange(e.target.checked)} />
-          <span>
-            <strong>Pular história</strong>
-            <small>Pula falas; escolhas importantes continuam aparecendo.</small>
-          </span>
-        </label>
-        <button className="btn" onClick={onHelp}>Como jogar</button>
-        <button className="btn" onClick={onAuto}>O autômato (PDA)</button>
-        <button className="btn" onClick={onCodex}>Referência</button>
-        <button className="btn tiny" onClick={onMute}>{muted ? '🔇 Som desligado' : '🔊 Som ligado'}</button>
+        {!showNewGameOptions ? (
+          <>
+            {hasSave && <button className="btn primary big" onClick={onContinue}>Continuar</button>}
+            <button className={`btn big ${hasSave ? '' : 'primary'}`} onClick={() => { setShowMore(false); setShowNewGameOptions(true); }}>Novo jogo</button>
+            <button
+              className="btn"
+              onClick={() => setShowMore((open) => !open)}
+              aria-expanded={showMore}
+              aria-controls="title-more-options"
+            >
+              Mais {showMore ? '▴' : '▾'}
+            </button>
+            {showMore && (
+              <div className="title-more" id="title-more-options">
+                <button className="btn" onClick={onHelp}>Como jogar</button>
+                <button className="btn" onClick={onAuto}>O autômato (PDA)</button>
+                <button className="btn" onClick={onCodex}>Referência</button>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="new-game-options">
+            <h2>Começar novo jogo</h2>
+            <label className="skip-story-option">
+              <input type="checkbox" checked={skipStory} onChange={(e) => onSkipStoryChange(e.target.checked)} />
+              <span>
+                <strong>Pular história</strong>
+                <small>Pula falas; escolhas importantes continuam aparecendo.</small>
+              </span>
+            </label>
+            <button className="btn primary big" onClick={onNew}>Começar</button>
+            <button className="btn" onClick={() => setShowNewGameOptions(false)}>Voltar</button>
+          </div>
+        )}
       </div>
       {/* atalho escondido para quem desenvolve: pula a introdução e vai direto ao salão, com empréstimo e tutorial feitos */}
       <button type="button" className="dev-hot" onClick={onDev} tabIndex={-1} aria-hidden="true" />
-      <p className="muted fine">Finais vistos: {endings}/3 · Salvamento automático neste navegador</p>
+      <p className="muted fine">Finais vistos: {endings}/3</p>
     </div>
   );
 }
