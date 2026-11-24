@@ -12,6 +12,7 @@ O projeto acadêmico coloca um **Autômato com Pilha (PDA)** no centro da jogabi
 
 Você controla **Capri**, condenado a disputar mesas para pagar uma dívida ao Tio Juros. Entre uma mesa e outra, explore os cenários do cassino, converse com personagens e procure pistas que podem enfraquecer as trapaças da casa.
 
+<img width="1444" height="741" alt="Captura de tela de 2026-11-24 08-00-55" src="https://github.com/user-attachments/assets/b65630ff-c535-402a-a2af-576d63e43172" />
 
 
 ### Percurso pela mesa
@@ -21,6 +22,9 @@ Você controla **Capri**, condenado a disputar mesas para pagar uma dívida ao T
 3. Pise em uma porta para executar `b` e retirar a carta do topo da pilha para a mão de poker.
 4. Chegue ao portal com a pilha vazia para executar `c` e aceitar o percurso.
 5. Pressione **Enter** para jogar a mão formada. Acompanhe a execução do PDA e a animação da pontuação; quando o total aparecer, pressione **Enter** novamente (ou clique em **Próxima mão**) para continuar.
+
+<img width="904" height="544" alt="Captura de tela de 2026-11-24 08-01-59" src="https://github.com/user-attachments/assets/ca24da7b-34a8-4a53-a3c4-c9accdcb31a8" />
+
 
 O jogador pode entregar até cinco cartas por mão. Em cada mapa há um **lixo**: pise nele com uma carta na pilha para descartá-la e receber uma carta nova na vaga correspondente. A mesa começa com **4 descartes de carta**, compartilhados entre todas as mãos; eles não são renovados ao iniciar outro mapa. É possível desfazer o último movimento com **Z** ou **Backspace**, reiniciar o percurso com **R** e solicitar uma nova distribuição com o botão de novo mapa.
 
@@ -33,9 +37,14 @@ multiplicador do PDA = 1 + 0,5 × profundidade máxima
 
 O painel informa fichas, multiplicadores e todos os fatores do cálculo ao final de uma mão.
 
+
+
 ### Poker e progressão
 
 As cartas podem formar Carta Alta, Par, Dois Pares, Trinca, Sequência, Flush, Full House, Quadra e Sequência do mesmo naipe. As combinações podem ser aprimoradas em nível na loja.
+
+<img width="1811" height="655" alt="Captura de tela de 2026-11-24 08-30-57" src="https://github.com/user-attachments/assets/dd765c56-6390-45aa-a13b-1c059aeec0cd" />
+
 
 Entre as mesas, o jogador pode:
 
