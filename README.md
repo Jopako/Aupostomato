@@ -1,8 +1,25 @@
-# Aupostomato
+<picture>
+  <source
+    media="(prefers-color-scheme: dark)"
+    srcset="./assets/logo-github-dark.png"
+  />
+  <source
+    media="(prefers-color-scheme: light)"
+    srcset="./assets/logo-github-light.png"
+  />
+  <img
+    alt="Aupostomato"
+    src="./assets/logo-github-light.png"
+    width="100%"
+  />
+</picture>
 
-**Aupostomato** é um roguelike de construção de baralho que combina poker, exploração em mapas e investigação, tudo executado no navegador.
+<div align = "center">
+  É um roguelike de construção de baralho que combina poker, exploração em mapas e investigação, tudo executado no navegador.
 
 O projeto acadêmico coloca um **Autômato com Pilha (PDA)** no centro da jogabilidade: o jogador percorre uma mesa no mapa, empilha cartas, entrega-as pelas portas e só pode sair pelo portal com a pilha vazia. Essa mesma sequência é processada por um autômato, estado por estado, durante a partida.
+</div>
+
 
 ## Jogabilidade
 
