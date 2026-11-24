@@ -1,18 +1,5 @@
-<picture>
-  <source
-    media="(prefers-color-scheme: dark)"
-    srcset="./assets/logo-github-dark.png"
-  />
-  <source
-    media="(prefers-color-scheme: light)"
-    srcset="./assets/logo-github-light.png"
-  />
-  <img
-    alt="Aupostomato"
-    src="./assets/logo-github-light.png"
-    width="100%"
-  />
-</picture>
+<img width="975" height="194" alt="logo-github-transparente" src="https://github.com/user-attachments/assets/794cdcb6-105e-4b1d-a72a-149c08f9309f" />
+
 
 <div align = "center">
   É um roguelike de construção de baralho que combina poker, exploração em mapas e investigação, tudo executado no navegador.
@@ -24,6 +11,8 @@ O projeto acadêmico coloca um **Autômato com Pilha (PDA)** no centro da jogabi
 ## Jogabilidade
 
 Você controla **Capri**, condenado a disputar mesas para pagar uma dívida ao Tio Juros. Entre uma mesa e outra, explore os cenários do cassino, converse com personagens e procure pistas que podem enfraquecer as trapaças da casa.
+
+
 
 ### Percurso pela mesa
 
